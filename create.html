@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bedrock Cape Editor - 128x HD Edition</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        :root { --bg: #0d0d0d; --panel: #161616; --accent: #3498db; --text: #f0f0f0; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; }
+        
+        .sidebar { width: 320px; background: var(--panel); border-right: 1px solid #222; padding: 25px; display: flex; flex-direction: column; overflow-y: auto; }
+        .main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; position: relative; }
+        
+        canvas { image-rendering: pixelated; border: 2px solid #333; max-width: 85%; background: #111; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        
+        .group { margin-bottom: 15px; }
+        label { display: block; font-size: 10px; color: #666; text-transform: uppercase; margin-bottom: 5px; letter-spacing: 1px; }
+        input[type="text"], input[type="number"], select { width: 100%; padding: 10px; background: #222; border: 1px solid #333; color: #fff; border-radius: 5px; }
+        
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-bottom: 10px; transition: all 0.2s; }
+        .btn-prime { background: var(--accent); color: white; }
+        .btn-prime:hover { background: #2980b9; transform: translateY(-1px); }
+        .btn-sec { background: #2d2d2d; color: #ccc; }
+        .btn-sec:hover { background: #3d3d3d; color: #fff; }
+
+        .lib-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; }
+        .lib-item { aspect-ratio: 1; background: #222; cursor: pointer; border: 1px solid #333; border-radius: 5px; overflow: hidden; }
+        .lib-item img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+
+        .toolbar { position: absolute; top: 20px; display: flex; gap: 10px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px; border: 1px solid #222; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h2 style="margin-top:0">HD Pack Builder</h2>
+    <p style="font-size: 11px; color: #888; margin-bottom: 20px;">Now exporting at 128x128 resolution.</p>
+    
+    <div class="group">
+        <label>Pack Branding</label>
+        <input type="text" id="packName" value="HD Cape Pack">
+        <input type="text" id="skinName" value="HD Custom Skin" style="margin-top:8px">
+    </div>
+
+    <div class="group">
+        <label>Marketplace</label>
+        <select id="skinType">
+            <option value="free">Free Skin</option>
+            <option value="paid">Premium (Marketplace Lock)</option>
+        </select>
+    </div>
+
+    <hr style="border:0; border-top:1px solid #222; margin: 20px 0;">
+
+    <button class="btn btn-sec" onclick="document.getElementById('skinIn').click()">Upload Skin (64 or 128)</button>
+    <input type="file" id="skinIn" hidden accept="image/png">
+    
+    <button class="btn btn-sec" onclick="document.getElementById('capeIn').click()">Upload HD Cape Image</button>
+    <input type="file" id="capeIn" hidden accept="image/*">
+
+    <button class="btn btn-prime" onclick="downloadPack()">Download 128x .mcpack</button>
+
+    <div class="group" style="margin-top:20px">
+        <label>Saved Library</label>
+        <button class="btn btn-sec" style="font-size: 10px;" onclick="saveToLib()">Add to library</button>
+        <div id="libGrid" class="lib-grid"></div>
+    </div>
+</div>
+
+<div class="main">
+    <div class="toolbar">
+        <button class="btn btn-sec" style="margin:0; width:auto" onclick="setMode('move')">Move Tool</button>
+        <button class="btn btn-sec" style="margin:0; width:auto" onclick="setMode('draw')">Brush Tool</button>
+        <input type="color" id="brushColor" value="#ffffff" style="height:38px; width:40px; padding:0; border:none; background:none; cursor:pointer">
+    </div>
+
+    <canvas id="viewCanvas" width="640" height="640"></canvas>
+    <canvas id="dataCanvas" width="128" height="128" style="display:none"></canvas>
+    <p style="color:#444; font-size:12px; margin-top:20px">Technical Layout: 128x HD Bedrock Standard.</p>
+</div>
+
+<script>
+    const vCanvas = document.getElementById('viewCanvas');
+    const vCtx = vCanvas.getContext('2d');
+    const dCanvas = document.getElementById('dataCanvas');
+    const dCtx = dCanvas.getContext('2d');
+
+    let skinImg = null;
+    let capeImg = null;
+    let editMode = 'move';
+    let isPainting = false;
+    let library = [];
+
+    // COORDINATES DOUBLED FOR 128x128 RESOLUTION
+    const LOC = {
+        main_face: { x: 112, y: 32, w: 16, h: 32 }, 
+        stripe1:   { x: 120, y: 64, w: 2, h: 32 }, 
+        stripe2:   { x: 122, y: 64, w: 2, h: 32 },
+        stripe3:   { x: 124, y: 64, w: 2, h: 32 },
+        stripe4:   { x: 126, y: 64, w: 2, h: 32 },
+        over1:     { x: 64,  y: 0,  w: 16, h: 16 }, 
+        over2:     { x: 112, y: 0,  w: 16, h: 16 }  
+    };
+
+    document.getElementById('skinIn').onchange = (e) => loadFile(e, i => skinImg = i);
+    document.getElementById('capeIn').onchange = (e) => loadFile(e, i => capeImg = i);
+
+    function loadFile(e, cb) {
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (f) => {
+            const img = new Image();
+            img.onload = () => { cb(img); render(); };
+            img.src = f.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function setMode(mode) { editMode = mode; }
+
+    function render() {
+        dCtx.clearRect(0, 0, 128, 128);
+        dCtx.imageSmoothingEnabled = false; // Keep it pixelated
+
+        if (skinImg) {
+            // Draws base skin scaled to 128x128 automatically
+            dCtx.drawImage(skinImg, 0, 0, 128, 128);
+        }
+
+        if (capeImg) {
+            // Main Face (HD) - Sliced from x=2, y=0, w=16, h=32
+            dCtx.drawImage(capeImg, 2, 0, 16, 32, 
+                           LOC.main_face.x, LOC.main_face.y, LOC.main_face.w, LOC.main_face.h);
+            
+            // Slice the 4 side stripes from your 40x32 template
+            // stripe1 (ML): x=0, y=0, w=2, h=32
+            dCtx.drawImage(capeImg, 0, 0, 2, 32, LOC.stripe1.x, LOC.stripe1.y, LOC.stripe1.w, LOC.stripe1.h);
+            // stripe2 (MR): x=18, y=0, w=2, h=32
+            dCtx.drawImage(capeImg, 18, 0, 2, 32, LOC.stripe2.x, LOC.stripe2.y, LOC.stripe2.w, LOC.stripe2.h);
+            // stripe3 (OL): x=20, y=0, w=2, h=32
+            dCtx.drawImage(capeImg, 20, 0, 2, 32, LOC.stripe3.x, LOC.stripe3.y, LOC.stripe3.w, LOC.stripe3.h);
+            // stripe4 (OR): x=38, y=0, w=2, h=32
+            dCtx.drawImage(capeImg, 38, 0, 2, 32, LOC.stripe4.x, LOC.stripe4.y, LOC.stripe4.w, LOC.stripe4.h);
+
+            // Overlayers (HD)
+            // over1 (Over Top): x=22, y=0, w=16, h=16
+            dCtx.drawImage(capeImg, 22, 0, 16, 16, LOC.over1.x, LOC.over1.y, LOC.over1.w, LOC.over1.h);
+            // over2 (Over Bot): x=22, y=16, w=16, h=16
+            dCtx.drawImage(capeImg, 22, 16, 16, 16, LOC.over2.x, LOC.over2.y, LOC.over2.w, LOC.over2.h);
+        }
+
+        vCtx.clearRect(0, 0, 640, 640);
+        vCtx.imageSmoothingEnabled = false;
+        vCtx.drawImage(dCanvas, 0, 0, 640, 640);
+
+        // HD Grid visualizer
+        vCtx.strokeStyle = "rgba(0, 255, 0, 0.3)";
+        vCtx.lineWidth = 1;
+        Object.values(LOC).forEach(l => {
+            // Scale visual boxes (640/128 = 5)
+            vCtx.strokeRect(l.x*5, l.y*5, l.w*5, l.h*5);
+        });
+    }
+
+    vCanvas.onmousedown = (e) => { if (editMode === 'draw') isPainting = true; paint(e); };
+    window.onmouseup = () => isPainting = false;
+    vCanvas.onmousemove = (e) => { if (isPainting) paint(e); };
+
+    function paint(e) {
+        if (editMode !== 'draw' || !isPainting) return;
+        const rect = vCanvas.getBoundingClientRect();
+        // Updated for 128 resolution tracking
+        const x = Math.floor((e.clientX - rect.left) / (rect.width / 128));
+        const y = Math.floor((e.clientY - rect.top) / (rect.height / 128));
+        dCtx.fillStyle = document.getElementById('brushColor').value;
+        dCtx.fillRect(x, y, 1, 1);
+        render();
+    }
+
+    function saveToLib() {
+        if (!capeImg) return;
+        library.push(capeImg.src);
+        updateLibrary();
+    }
+
+    function updateLibrary() {
+        const grid = document.getElementById('libGrid');
+        grid.innerHTML = '';
+        library.forEach(src => {
+            const item = document.createElement('div');
+            item.className = 'lib-item';
+            item.innerHTML = `<img src="${src}">`;
+            item.onclick = () => {
+                const i = new Image();
+                i.onload = () => { capeImg = i; render(); };
+                i.src = src;
+            };
+            grid.appendChild(item);
+        });
+    }
+
+    async function downloadPack() {
+        if (!skinImg) return alert("Please upload a base skin!");
+        const zip = new JSZip();
+        const pName = document.getElementById('packName').value;
+        const sName = document.getElementById('skinName').value;
+        const sType = document.getElementById('skinType').value;
+        const pID = pName.replace(/\s/g, "_").toLowerCase();
+
+        // This exports the 128x128 blob
+        const skinBlob = await new Promise(r => dCanvas.toBlob(r));
+        
+        const manifest = {
+            format_version: 1,
+            header: { name: pName, uuid: crypto.randomUUID(), version: [1, 0, 0] },
+            modules: [{ type: "skin_pack", uuid: crypto.randomUUID(), version: [1, 0, 0] }]
+        };
+
+        const skins = {
+            serialize_name: pID,
+            localization_name: pID,
+            skins: [{
+                localization_name: "custom",
+                geometry: "geometry.humanoid.custom",
+                texture: "skin.png",
+                type: sType
+            }]
+        };
+
+        zip.file("skin.png", skinBlob);
+        zip.file("manifest.json", JSON.stringify(manifest, null, 4));
+        zip.file("skins.json", JSON.stringify(skins, null, 4));
+        if(!zip.folder("texts")) zip.folder("texts");
+        zip.file("texts/en_US.lang", `skinpack.${pID}=${pName}\nskin.${pID}.custom=${sName}`);
+
+        zip.generateAsync({type:"blob"}).then(c => saveAs(c, `${pID}.mcpack`));
+    }
+
+    render();
+</script>
+</body>
+</html>

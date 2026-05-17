@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cape UV Editor</title>
+
+<style>
+
+:root{
+    --bg:#141414;
+    --panel:#1c1c1c;
+    --border:#2a2a2a;
+    --accent:#0ea5e9;
+    --text:#e8e8e8;
+    --sub:#666;
+}
+
+*{
+    box-sizing:border-box;
+}
+
+html,body{
+    margin:0;
+    height:100%;
+    overflow:hidden;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Courier New', monospace;
+}
+
+canvas{
+    position:absolute;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    display:block;
+    touch-action:none;
+}
+
+nav{
+    position:absolute;
+    top:0;
+    left:0;
+    width:100%;
+    height:48px;
+    background:var(--panel);
+    border-bottom:1px solid var(--border);
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:0 16px;
+    z-index:20;
+}
+
+.logo{
+    font-size:13px;
+    font-weight:bold;
+    letter-spacing:2px;
+}
+
+.logo em{
+    color:var(--accent);
+    font-style:normal;
+}
+
+.sidebar{
+    position:absolute;
+    left:12px;
+    top:60px;
+    width:220px;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:14px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    z-index:10;
+}
+
+#capePreviewWrap{
+    position:absolute;
+    right:12px;
+    top:60px;
+    width:260px;
+    height:300px;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:12px;
+    z-index:10;
+}
+
+#capePreview{
+    width:100%;
+    height:100%;
+    image-rendering:pixelated;
+    background:#111;
+    border-radius:4px;
+}
+
+button{
+    background:#2a2a2a;
+    color:var(--text);
+    border:1px solid var(--border);
+    border-radius:4px;
+    padding:6px 10px;
+    cursor:pointer;
+    font-family:inherit;
+    font-size:11px;
+}
+
+button:hover{
+    background:#333;
+}
+
+button.active{
+    background:var(--accent);
+    border-color:var(--accent);
+}
+
+button.success{
+    background:#059669;
+    border-color:#059669;
+}
+
+button:disabled{
+    opacity:.45;
+    cursor:not-allowed;
+}
+
+.btn-row{
+    display:flex;
+    gap:6px;
+}
+
+.btn-row button{
+    flex:1;
+}
+
+.sec-title{
+    font-size:9px;
+    color:var(--sub);
+    letter-spacing:2px;
+    text-transform:uppercase;
+    margin-bottom:6px;
+}
+
+.zone-list{
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+}
+
+.zone-item{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-size:10px;
+    color:#aaa;
+}
+
+.zone-swatch{
+    width:10px;
+    height:10px;
+    border-radius:2px;
+}
+
+#transformUI{
+    display:none;
+    background:rgba(14,165,233,.08);
+    border:1px solid #0ea5e930;
+    border-radius:6px;
+    padding:10px;
+}
+
+.hint{
+    font-size:9px;
+    color:#444;
+    line-height:1.7;
+}
+
+</style>
+</head>
+
+<body>
+
+<nav>
+
+<div class="logo">
+CAPE <em>UV</em> EDITOR
+</div>
+
+<input type="file" id="imageLoader" style="display:none" accept="image/*">
+
+<button onclick="document.getElementById('imageLoader').click()">
+Import Image
+</button>
+
+<button id="zonesBtn" class="active" onclick="toggleZones()">
+Zones
+</button>
+
+<button id="gridBtn" onclick="toggleGrid()">
+Grid
+</button>
+
+<button class="success" onclick="exportUV()">
+Export UV PNG
+</button>
+
+</nav>
+
+<div class="sidebar">
+
+<div>
+<div class="sec-title">History</div>
+
+<div class="btn-row">
+<button id="undoBtn" disabled>↩ Undo</button>
+<button id="redoBtn" disabled>↪ Redo</button>
+</div>
+</div>
+
+<div>
+
+<div class="sec-title">Tools</div>
+
+<div class="btn-row">
+<button id="btn-draw" class="active" onclick="setMode('draw')">
+✏ Draw
+</button>
+
+<button id="btn-erase" onclick="setMode('erase')">
+⬜ Erase
+</button>
+</div>
+
+<div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
+
+<input type="color" id="colorPicker" value="#ff4040">
+
+<input type="range"
+id="brushSize"
+min="1"
+max="4"
+value="1"
+style="flex:1;accent-color:var(--accent)">
+
+<span id="brushLabel" style="font-size:10px;color:#777;">
+1
+</span>
+
+</div>
+
+</div>
+
+<div id="transformUI">
+
+<div class="sec-title" style="color:var(--accent)">
+IMAGE PLACEMENT
+</div>
+
+<p style="font-size:10px;color:#888;">
+Drag image to move. Drag corners to resize.
+</p>
+
+<button class="success" id="applyBtn" style="width:100%;">
+✓ Apply Image
+</button>
+
+</div>
+
+<div>
+
+<div class="sec-title">
+UV Layout
+</div>
+
+<div class="zone-list" id="zoneList"></div>
+
+</div>
+
+<div class="hint">
+<b>Wheel</b> — Zoom<br>
+<b>Middle Drag</b> — Pan<br>
+<b>Right Click</b> — Erase<br>
+<b>Ctrl+Z/Y</b> — Undo/Redo
+</div>
+
+</div>
+
+<div id="capePreviewWrap">
+<canvas id="capePreview" width="260" height="300"></canvas>
+</div>
+
+<canvas id="appCanvas"></canvas>
+
+<script>
+
+// MAIN CANVAS
+
+const appCanvas = document.getElementById('appCanvas');
+const ctx = appCanvas.getContext('2d');
+
+const COLS = 40;
+const ROWS = 32;
+
+const pixelCanvas = document.createElement('canvas');
+pixelCanvas.width = COLS;
+pixelCanvas.height = ROWS;
+
+const pCtx = pixelCanvas.getContext('2d');
+pCtx.imageSmoothingEnabled = false;
+
+// PREVIEW
+
+const capePreview = document.getElementById('capePreview');
+const capeCtx = capePreview.getContext('2d');
+capeCtx.imageSmoothingEnabled = false;
+
+// UV ZONES
+
+const ZONES = [
+
+{
+name:'Main Cape',
+x:0,
+y:0,
+w:20,
+h:32,
+stroke:'#ff5050',
+fill:'rgba(255,70,70,.13)',
+label:'MAIN'
+},
+
+{
+name:'Overlay Left',
+x:20,
+y:0,
+w:2,
+h:32,
+stroke:'#5577FF',
+fill:'rgba(80,120,255,.16)',
+label:'L'
+},
+
+{
+name:'Overlay Top',
+x:22,
+y:0,
+w:16,
+h:16,
+stroke:'#FF50E6',
+fill:'rgba(255,80,230,.14)',
+label:'TOP'
+},
+
+{
+name:'Overlay Bottom',
+x:22,
+y:16,
+w:16,
+h:16,
+stroke:'#8237FF',
+fill:'rgba(130,55,255,.14)',
+label:'BOT'
+},
+
+{
+name:'Overlay Right',
+x:38,
+y:0,
+w:2,
+h:32,
+stroke:'#00D2FF',
+fill:'rgba(0,210,255,.16)',
+label:'R'
+}
+
+];
+
+// sidebar list
+
+const zoneList = document.getElementById('zoneList');
+
+ZONES.forEach(z=>{
+
+const div = document.createElement('div');
+
+div.className = 'zone-item';
+
+div.innerHTML = `
+<div class="zone-swatch" style="background:${z.stroke}"></div>
+<span>${z.name}</span>
+`;
+
+zoneList.appendChild(div);
+
+});
+
+// STATE
+
+let zoom = 14;
+
+let panX = 0;
+let panY = 0;
+
+let mode = 'draw';
+
+let isDrawing = false;
+let isPanning = false;
+
+let showZones = true;
+let showGrid = false;
+
+// import transform
+
+let imgObj = null;
+
+let imgX = 0;
+let imgY = 0;
+
+let imgW = 0;
+let imgH = 0;
+
+let movingImage = false;
+let resizing = false;
+
+let resizeCorner = null;
+
+// history
+
+const undoStack = [];
+const redoStack = [];
+
+const MAX_HISTORY = 60;
+
+// preview animation
+
+let previewRot = 0;
+
+// RESIZE
+
+function resize(){
+
+appCanvas.width = innerWidth;
+appCanvas.height = innerHeight;
+
+panX = innerWidth/2 - (COLS*zoom)/2;
+panY = innerHeight/2 - (ROWS*zoom)/2;
+
+render();
+
+}
+
+window.addEventListener('resize', resize);
+
+resize();
+
+// HISTORY
+
+function saveState(){
+
+if(undoStack.length >= MAX_HISTORY){
+
+undoStack.shift();
+
+}
+
+undoStack.push(
+pCtx.getImageData(0,0,COLS,ROWS)
+);
+
+redoStack.length = 0;
+
+updateHistoryButtons();
+
+}
+
+function undo(){
+
+if(!undoStack.length) return;
+
+redoStack.push(
+pCtx.getImageData(0,0,COLS,ROWS)
+);
+
+pCtx.putImageData(
+undoStack.pop(),
+0,
+0
+);
+
+updateHistoryButtons();
+
+render();
+
+}
+
+function redo(){
+
+if(!redoStack.length) return;
+
+undoStack.push(
+pCtx.getImageData(0,0,COLS,ROWS)
+);
+
+pCtx.putImageData(
+redoStack.pop(),
+0,
+0
+);
+
+updateHistoryButtons();
+
+render();
+
+}
+
+function updateHistoryButtons(){
+
+document.getElementById('undoBtn').disabled =
+!undoStack.length;
+
+document.getElementById('redoBtn').disabled =
+!redoStack.length;
+
+}
+
+document.getElementById('undoBtn').onclick = undo;
+document.getElementById('redoBtn').onclick = redo;
+
+// MAIN RENDER
+
+function render(){
+
+ctx.fillStyle = '#111';
+ctx.fillRect(0,0,appCanvas.width,appCanvas.height);
+
+// dots
+
+ctx.fillStyle = '#1b1b1b';
+
+for(let y=0;y<appCanvas.height;y+=20){
+
+for(let x=0;x<appCanvas.width;x+=20){
+
+ctx.fillRect(x,y,1,1);
+
+}
+
+}
+
+// shadow
+
+ctx.fillStyle = '#000';
+
+ctx.fillRect(
+panX-3,
+panY-3,
+COLS*zoom+6,
+ROWS*zoom+6
+);
+
+// checkerboard
+
+for(let y=0;y<ROWS;y++){
+
+for(let x=0;x<COLS;x++){
+
+ctx.fillStyle =
+(x+y)%2===0 ? '#202020' : '#181818';
+
+ctx.fillRect(
+panX+x*zoom,
+panY+y*zoom,
+zoom,
+zoom
+);
+
+}
+
+}
+
+// pixels
+
+ctx.imageSmoothingEnabled = false;
+
+ctx.drawImage(
+pixelCanvas,
+panX,
+panY,
+COLS*zoom,
+ROWS*zoom
+);
+
+// zones
+
+if(showZones){
+
+ZONES.forEach(z=>{
+
+const sx = panX + z.x*zoom;
+const sy = panY + z.y*zoom;
+
+const sw = z.w*zoom;
+const sh = z.h*zoom;
+
+ctx.fillStyle = z.fill;
+
+ctx.fillRect(
+sx,
+sy,
+sw,
+sh
+);
+
+ctx.strokeStyle = z.stroke;
+ctx.lineWidth = 1.5;
+
+ctx.strokeRect(
+sx+.5,
+sy+.5,
+sw-1,
+sh-1
+);
+
+ctx.fillStyle = z.stroke;
+ctx.font = 'bold 10px Courier New';
+
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+
+ctx.fillText(
+z.label,
+sx+sw/2,
+sy+sh/2
+);
+
+});
+
+}
+
+// grid
+
+if(showGrid && zoom >= 8){
+
+ctx.strokeStyle = 'rgba(255,255,255,.06)';
+ctx.lineWidth = .5;
+
+for(let i=0;i<=COLS;i++){
+
+ctx.beginPath();
+
+ctx.moveTo(
+panX+i*zoom,
+panY
+);
+
+ctx.lineTo(
+panX+i*zoom,
+panY+ROWS*zoom
+);
+
+ctx.stroke();
+
+}
+
+for(let j=0;j<=ROWS;j++){
+
+ctx.beginPath();
+
+ctx.moveTo(
+panX,
+panY+j*zoom
+);
+
+ctx.lineTo(
+panX+COLS*zoom,
+panY+j*zoom
+);
+
+ctx.stroke();
+
+}
+
+}
+
+// image transform preview
+
+if(imgObj){
+
+const sx = panX + imgX*zoom;
+const sy = panY + imgY*zoom;
+
+const sw = imgW*zoom;
+const sh = imgH*zoom;
+
+ctx.globalAlpha = .85;
+
+ctx.drawImage(
+imgObj,
+sx,
+sy,
+sw,
+sh
+);
+
+ctx.globalAlpha = 1;
+
+ctx.strokeStyle = '#0ea5e9';
+ctx.lineWidth = 2;
+
+ctx.strokeRect(
+sx,
+sy,
+sw,
+sh
+);
+
+ctx.fillStyle = '#fff';
+
+getHandles(sx,sy,sw,sh).forEach(h=>{
+
+ctx.fillRect(
+h.x-4,
+h.y-4,
+8,
+8
+);
+
+});
+
+}
+
+}
+
+// FIXED CAPE PREVIEW
+
+function renderCapePreview(){
+
+const w = capePreview.width;
+const h = capePreview.height;
+
+capeCtx.clearRect(0,0,w,h);
+
+capeCtx.fillStyle = '#111';
+capeCtx.fillRect(0,0,w,h);
+
+previewRot += 0.02;
+const swing = Math.sin(previewRot) * 6;
+
+/* TRUE Y-AXIS COMPRESSION */
+const squashY = 0.72; // <- lower = shorter cape
+
+capeCtx.save();
+
+/* center */
+capeCtx.translate(w/2, h/2 + 6);
+
+/* perspective */
+const perspective = 0.82 + Math.cos(previewRot) * 0.02;
+capeCtx.transform(perspective, 0, 0, 1, 0, 0);
+
+/* 🔥 THIS is the key: squash ONLY Y axis */
+capeCtx.scale(1, squashY);
+
+/* now everything below is in “unsquashed space” */
+
+const x = -42 + swing * 0.22;
+const y = -118;
+const wCape = 84;
+const hCape = 236;
+
+/* shadow */
+capeCtx.fillStyle = 'rgba(0,0,0,.35)';
+capeCtx.fillRect(
+    -42 + swing * 0.18,
+    y,
+    wCape,
+    hCape
+);
+
+/* MAIN CAPE */
+capeCtx.drawImage(
+    pixelCanvas,
+    0, 0, 20, 32,
+    x,
+    y,
+    wCape,
+    hCape
+);
+
+/* OVERLAY */
+capeCtx.globalAlpha = 0.95;
+
+capeCtx.drawImage(
+    pixelCanvas,
+    20, 0, 20, 32,
+    x,
+    y,
+    wCape,
+    hCape
+);
+
+capeCtx.globalAlpha = 1;
+
+/* lighting */
+const grad = capeCtx.createLinearGradient(
+    -42,
+    y,
+    wCape,
+    y + hCape
+);
+
+grad.addColorStop(0,'rgba(255,255,255,.08)');
+grad.addColorStop(0.5,'rgba(255,255,255,0)');
+grad.addColorStop(1,'rgba(0,0,0,.35)');
+
+capeCtx.fillStyle = grad;
+
+capeCtx.fillRect(
+    -42,
+    y,
+    wCape,
+    hCape
+);
+
+/* collar */
+capeCtx.fillStyle = '#2a2a2a';
+capeCtx.fillRect(
+    -42,
+    y - 8,
+    wCape,
+    8
+);
+
+/* outline */
+capeCtx.strokeStyle = 'rgba(255,255,255,.06)';
+capeCtx.lineWidth = 1;
+
+capeCtx.strokeRect(
+    -46,
+    y - 20,
+    92,
+    296
+);
+
+capeCtx.restore();
+
+requestAnimationFrame(renderCapePreview);
+}
+
+renderCapePreview();
+
+// HANDLES
+
+function getHandles(x,y,w,h){
+
+return [
+
+{corner:'tl',x,y},
+{corner:'tr',x:x+w,y},
+{corner:'bl',x,y:y+h},
+{corner:'br',x:x+w,y:y+h}
+
+];
+
+}
+
+// DRAW
+
+function drawPixel(e){
+
+const gx = Math.floor((e.clientX-panX)/zoom);
+const gy = Math.floor((e.clientY-panY)/zoom);
+
+if(gx<0 || gy<0 || gx>=COLS || gy>=ROWS) return;
+
+const size =
+parseInt(
+document.getElementById('brushSize').value
+);
+
+if(e.buttons===2 || mode==='erase'){
+
+pCtx.clearRect(
+gx,
+gy,
+size,
+size
+);
+
+}else{
+
+pCtx.fillStyle =
+document.getElementById('colorPicker').value;
+
+pCtx.fillRect(
+gx,
+gy,
+size,
+size
+);
+
+}
+
+render();
+
+}
+
+// INPUT
+
+appCanvas.addEventListener('mousedown', e=>{
+
+if(e.button===1){
+
+isPanning = true;
+return;
+
+}
+
+// image transform
+
+if(imgObj){
+
+const sx = panX + imgX*zoom;
+const sy = panY + imgY*zoom;
+
+const sw = imgW*zoom;
+const sh = imgH*zoom;
+
+const handles =
+getHandles(sx,sy,sw,sh);
+
+const clicked =
+handles.find(h=>
+
+Math.abs(e.clientX-h.x)<8 &&
+Math.abs(e.clientY-h.y)<8
+
+);
+
+if(clicked){
+
+resizing = true;
+resizeCorner = clicked.corner;
+
+return;
+
+}
+
+if(
+
+e.clientX>=sx &&
+e.clientX<=sx+sw &&
+e.clientY>=sy &&
+e.clientY<=sy+sh
+
+){
+
+movingImage = true;
+return;
+
+}
+
+}
+
+saveState();
+
+isDrawing = true;
+
+drawPixel(e);
+
+});
+
+window.addEventListener('mousemove', e=>{
+
+if(isPanning){
+
+panX += e.movementX;
+panY += e.movementY;
+
+render();
+
+}
+
+else if(movingImage){
+
+imgX += e.movementX/zoom;
+imgY += e.movementY/zoom;
+
+render();
+
+}
+
+else if(resizing){
+
+const dx = e.movementX/zoom;
+const dy = e.movementY/zoom;
+
+if(resizeCorner==='br'){
+imgW += dx;
+imgH += dy;
+}
+
+if(resizeCorner==='tr'){
+imgW += dx;
+imgY += dy;
+imgH -= dy;
+}
+
+if(resizeCorner==='bl'){
+imgX += dx;
+imgW -= dx;
+imgH += dy;
+}
+
+if(resizeCorner==='tl'){
+imgX += dx;
+imgY += dy;
+imgW -= dx;
+imgH -= dy;
+}
+
+imgW = Math.max(1,imgW);
+imgH = Math.max(1,imgH);
+
+render();
+
+}
+
+else if(isDrawing){
+
+drawPixel(e);
+
+}
+
+});
+
+window.addEventListener('mouseup', ()=>{
+
+isDrawing = false;
+isPanning = false;
+
+movingImage = false;
+resizing = false;
+
+});
+
+appCanvas.addEventListener('wheel', e=>{
+
+e.preventDefault();
+
+const factor =
+e.deltaY>0 ? .88 : 1.14;
+
+const newZoom =
+Math.min(
+Math.max(zoom*factor,2),
+64
+);
+
+panX =
+e.clientX -
+(e.clientX-panX)*(newZoom/zoom);
+
+panY =
+e.clientY -
+(e.clientY-panY)*(newZoom/zoom);
+
+zoom = newZoom;
+
+render();
+
+},{passive:false});
+
+appCanvas.addEventListener('contextmenu', e=>{
+e.preventDefault();
+});
+
+window.addEventListener('keydown', e=>{
+
+if((e.ctrlKey||e.metaKey) && e.key==='z'){
+
+e.preventDefault();
+undo();
+
+}
+
+if((e.ctrlKey||e.metaKey) && e.key==='y'){
+
+e.preventDefault();
+redo();
+
+}
+
+});
+
+// CONTROLS
+
+function setMode(m){
+
+mode = m;
+
+document.getElementById('btn-draw')
+.classList.toggle('active',m==='draw');
+
+document.getElementById('btn-erase')
+.classList.toggle('active',m==='erase');
+
+}
+
+function toggleZones(){
+
+showZones = !showZones;
+
+document.getElementById('zonesBtn')
+.classList.toggle('active',showZones);
+
+render();
+
+}
+
+function toggleGrid(){
+
+showGrid = !showGrid;
+
+document.getElementById('gridBtn')
+.classList.toggle('active',showGrid);
+
+render();
+
+}
+
+document.getElementById('brushSize')
+.addEventListener('input', e=>{
+
+document.getElementById('brushLabel')
+.textContent = e.target.value;
+
+});
+
+// IMPORT IMAGE
+
+document.getElementById('imageLoader')
+.addEventListener('change', e=>{
+
+const file = e.target.files[0];
+if(!file) return;
+
+const reader = new FileReader();
+
+reader.onload = ev=>{
+
+imgObj = new Image();
+
+imgObj.onload = ()=>{
+
+imgW = COLS * .7;
+
+imgH = imgW * (imgObj.height / imgObj.width);
+
+imgX = (COLS - imgW) / 2;
+imgY = (ROWS - imgH) / 2;
+
+document.getElementById('transformUI')
+.style.display = 'block';
+
+render();
+
+};
+
+imgObj.src = ev.target.result;
+
+};
+
+reader.readAsDataURL(file);
+
+/* 🔥 THIS IS THE FIX */
+e.target.value = '';
+
+});
+
+document.getElementById('applyBtn')
+.addEventListener('click', ()=>{
+
+if(!imgObj) return;
+
+saveState();
+
+pCtx.drawImage(
+imgObj,
+imgX,
+imgY,
+imgW,
+imgH
+);
+
+imgObj = null;
+
+document.getElementById('transformUI')
+.style.display = 'none';
+
+render();
+
+});
+
+// EXPORT
+
+function exportUV(){
+
+pixelCanvas.toBlob(blob=>{
+
+const a =
+document.createElement('a');
+
+a.href =
+URL.createObjectURL(blob);
+
+a.download =
+'cape_uv.png';
+
+a.click();
+
+});
+
+}
+
+render();
+
+</script>
+
+</body>
+</html>

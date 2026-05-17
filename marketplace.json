@@ -1,0 +1,224 @@
+[
+    {
+        "id": "snwoman",
+        "name": "Snwoman",
+        "texture": "capes/snwoman.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "christmas2010",
+        "name": "Christmas2010",
+        "texture": "capes/christmas2010.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "mcc15",
+        "name": "Mcc15",
+        "texture": "capes/mcc15.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "vanilla",
+        "name": "Vanilla",
+        "texture": "capes/vanilla.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "migrator",
+        "name": "Migrator",
+        "texture": "capes/migrator.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "founders",
+        "name": "Founders",
+        "texture": "capes/Founders.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "scrolls",
+        "name": "Scrolls",
+        "texture": "capes/scrolls.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "mojangclassic",
+        "name": "Mojangclassic",
+        "texture": "capes/mojangclassic.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "mojangstudios",
+        "name": "Mojangstudios",
+        "texture": "capes/MojangStudios.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "millionthcustomer",
+        "name": "Millionthcustomer",
+        "texture": "capes/millionthcustomer.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "translator",
+        "name": "Translator",
+        "texture": "capes/translator.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "minecon2013",
+        "name": "Minecon2013",
+        "texture": "capes/minecon2013.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "minecon2012",
+        "name": "Minecon2012",
+        "texture": "capes/minecon2012.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "home",
+        "name": "Home",
+        "texture": "capes/home.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "minecon2016",
+        "name": "Minecon2016",
+        "texture": "capes/minecon2016.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "15thann",
+        "name": "15Thann",
+        "texture": "capes/15thann.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "mojangofficial",
+        "name": "Mojangofficial",
+        "texture": "capes/MojangOfficial.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "minecon2015",
+        "name": "Minecon2015",
+        "texture": "capes/minecon2015.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "prismarine",
+        "name": "Prismarine",
+        "texture": "capes/prismarine.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "wemmbu",
+        "name": "Wemmbu",
+        "texture": "capes/wemmbu.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "cherryblossom",
+        "name": "Cherryblossom",
+        "texture": "capes/cherryblossom.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "tiktok",
+        "name": "Tiktok",
+        "texture": "capes/tiktok.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "birthday",
+        "name": "Birthday",
+        "texture": "capes/birthday.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "copper",
+        "name": "Copper",
+        "texture": "capes/copper.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "cobalt",
+        "name": "Cobalt",
+        "texture": "capes/cobalt.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "minecraftexperience",
+        "name": "Minecraftexperience",
+        "texture": "capes/MinecraftExperience.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "moderator",
+        "name": "Moderator",
+        "texture": "capes/moderator.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "purpleheart",
+        "name": "Purpleheart",
+        "texture": "capes/purpleheart.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "yearn",
+        "name": "Yearn",
+        "texture": "capes/Yearn.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "valentine",
+        "name": "Valentine",
+        "texture": "capes/valentine.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "mojang",
+        "name": "Mojang",
+        "texture": "capes/mojang.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "bacon",
+        "name": "Bacon",
+        "texture": "capes/bacon.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "minecon",
+        "name": "Minecon",
+        "texture": "capes/minecon.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "common",
+        "name": "Common",
+        "texture": "capes/common.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "newyear2011",
+        "name": "Newyear2011",
+        "texture": "capes/newyear2011.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "menace",
+        "name": "Menace",
+        "texture": "capes/menace.png",
+        "thumbnail": ""
+    },
+    {
+        "id": "zombiehorse",
+        "name": "Zombiehorse",
+        "texture": "capes/zombiehorse.png",
+        "thumbnail": ""
+    }
+]

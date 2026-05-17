@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cape Marketplace - 128x HD Edition</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        :root { --bg: #0d0d0d; --panel: #161616; --accent: #3498db; --text: #f0f0f0; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        .sidebar { width: 320px; background: var(--panel); border-right: 1px solid #222; padding: 25px; display: flex; flex-direction: column; overflow-y: auto; z-index: 10; }
+        .main { flex: 1; display: flex; flex-direction: column; background: #000; position: relative; overflow-y: auto; padding: 30px; }
+        
+        .group { margin-bottom: 15px; }
+        label { display: block; font-size: 10px; color: #666; text-transform: uppercase; margin-bottom: 5px; letter-spacing: 1px; }
+        input[type="text"], input[type="number"], select { width: 100%; padding: 10px; background: #222; border: 1px solid #333; color: #fff; border-radius: 5px; box-sizing: border-box; }
+        
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-bottom: 10px; transition: all 0.2s; box-sizing: border-box; }
+        .btn-prime { background: var(--accent); color: white; }
+        .btn-prime:hover { background: #2980b9; transform: translateY(-1px); }
+        .btn-sec { background: #2d2d2d; color: #ccc; }
+        .btn-sec:hover { background: #3d3d3d; color: #fff; }
+        .btn-disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+
+        /* Marketplace Grid Styling */
+        .header { margin-bottom: 20px; border-bottom: 1px solid #222; padding-bottom: 10px; }
+        .header h1 { margin: 0; font-size: 24px; }
+        
+        .market-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 20px; }
+        .cape-item { background: var(--panel); border: 2px solid #333; border-radius: 8px; padding: 10px; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; }
+        .cape-item:hover { border-color: #555; transform: translateY(-3px); }
+        .cape-item.selected { border-color: var(--accent); background: rgba(52, 152, 219, 0.1); box-shadow: 0 0 15px rgba(52, 152, 219, 0.2); }
+        
+        .cape-thumb { width: 100%; aspect-ratio: 1; background: #111; border-radius: 5px; margin-bottom: 10px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        .cape-thumb img { max-width: 100%; max-height: 100%; image-rendering: pixelated; object-fit: contain; }
+        .cape-name { font-size: 13px; text-align: center; font-weight: bold; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        #status { font-size: 12px; color: var(--accent); margin-top: 10px; text-align: center; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h2 style="margin-top:0">Marketplace Exporter</h2>
+    <p style="font-size: 11px; color: #888; margin-bottom: 20px;">Select capes, add your skin, get a pack.</p>
+    
+    <div class="group">
+        <label>Pack Settings</label>
+        <input type="text" id="packName" value="HD Cape Pack">
+        <input type="text" id="skinBaseName" value="HD Custom Skin" style="margin-top:8px" placeholder="Base Skin Name">
+    </div>
+
+    <div class="group">
+        <label>Marketplace Properties</label>
+        <select id="skinType">
+            <option value="free">Free Skin</option>
+            <option value="paid">Premium (Marketplace Lock)</option>
+        </select>
+    </div>
+
+    <div class="group">
+        <label>Skin Status</label>
+        <button id="uploadBtn" class="btn btn-sec" onclick="document.getElementById('skinIn').click()">1. Upload Base Skin</button>
+        <input type="file" id="skinIn" hidden accept="image/png">
+        <p id="skinStatusText" style="font-size: 11px; color: #e74c3c; margin-top: -5px;">No skin uploaded</p>
+    </div>
+
+    <hr style="border:0; border-top:1px solid #222; margin: 20px 0;">
+
+    <button id="downloadBtn" class="btn btn-prime btn-disabled" onclick="downloadPack()">2. Download Selected (0)</button>
+    <div id="status">Generating pack... Please wait.</div>
+    
+    <canvas id="dataCanvas" width="128" height="128" style="display:none"></canvas>
+</div>
+
+<div class="main">
+    <div class="header">
+        <h1>Available Capes</h1>
+        <p style="font-size: 13px; color: #888;">Select multiple capes to generate a skin pack with all your choices.</p>
+    </div>
+    <div id="marketGrid" class="market-grid">
+        </div>
+</div>
+
+<script>
+    const dCanvas = document.getElementById('dataCanvas');
+    const dCtx = dCanvas.getContext('2d');
+    
+    let marketplaceData = [];
+    let skinImg = null;
+    let selectedCapes = new Set();
+
+    // Exact layout coordinates mapped from your original file
+    const LOC = {
+        main_face: { x: 112, y: 32, w: 16, h: 32 }, 
+        stripe1:   { x: 120, y: 64, w: 2, h: 32 }, 
+        stripe2:   { x: 122, y: 64, w: 2, h: 32 },
+        stripe3:   { x: 124, y: 64, w: 2, h: 32 },
+        stripe4:   { x: 126, y: 64, w: 2, h: 32 },
+        over1:     { x: 64,  y: 0,  w: 16, h: 16 }, 
+        over2:     { x: 112, y: 0,  w: 16, h: 16 }  
+    };
+
+    // --- FETCH DATA FROM EXTERNAL JSON ---
+    async function loadMarketplaceData() {
+        try {
+            const response = await fetch('marketplace.json');
+            if (!response.ok) throw new Error("Failed to load marketplace JSON file.");
+            
+            marketplaceData = await response.json();
+            renderMarketplaceGrid();
+        } catch (error) {
+            console.error("Error fetching external catalog:", error);
+            document.getElementById('marketGrid').innerHTML = `<p style="color: #e74c3c;">Failed to load marketplace data. Ensure you are running this app from a local web server (e.g. VS Code Live Server).</p>`;
+        }
+    }
+
+    // --- RENDER GRID FROM FETCHED DATA ---
+    function renderMarketplaceGrid() {
+        const grid = document.getElementById('marketGrid');
+        grid.innerHTML = '';
+        
+        marketplaceData.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'cape-item';
+            div.onclick = () => toggleSelection(item.id, div);
+            
+            const imgSrc = (item.thumbnail && item.thumbnail.trim() !== "") ? item.thumbnail : item.texture;
+            
+            div.innerHTML = `
+                <div class="cape-thumb"><img src="${imgSrc}" alt="${item.name}"></div>
+                <div class="cape-name">${item.name}</div>
+            `;
+            grid.appendChild(div);
+        });
+    }
+
+    function toggleSelection(id, element) {
+        if (selectedCapes.has(id)) {
+            selectedCapes.delete(id);
+            element.classList.remove('selected');
+        } else {
+            selectedCapes.add(id);
+            element.classList.add('selected');
+        }
+        updateDownloadButton();
+    }
+
+    // --- SKIN PACK FILE UPLOAD HANDLER ---
+    document.getElementById('skinIn').onchange = (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (f) => {
+            const img = new Image();
+            img.onload = () => { 
+                skinImg = img; 
+                document.getElementById('skinStatusText').innerText = "✓ Skin Uploaded";
+                document.getElementById('skinStatusText').style.color = "#2ecc71";
+                document.getElementById('uploadBtn').innerText = "Change Base Skin";
+                updateDownloadButton();
+            };
+            img.src = f.target.result;
+        };
+        reader.readAsDataURL(file);
+    };
+
+    function updateDownloadButton() {
+        const btn = document.getElementById('downloadBtn');
+        btn.innerText = `2. Download Selected (${selectedCapes.size})`;
+        
+        if (skinImg && selectedCapes.size > 0) {
+            btn.classList.remove('btn-disabled');
+        } else {
+            btn.classList.add('btn-disabled');
+        }
+    }
+
+    // FIXED: Removed crossOrigin assignment to prevent local path server rejections
+    const loadImage = (src) => new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = (err) => reject(new Error(`Failed to load image path: ${src}. Verify file existence.`));
+        img.src = src;
+    });
+
+    // --- BATCH PROCESS COMPILATION (TEXTURE BASED) ---
+    async function downloadPack() {
+        if (!skinImg) return alert("Please upload a base skin!");
+        if (selectedCapes.size === 0) return alert("Select at least one cape!");
+
+        document.getElementById('status').style.display = 'block';
+        
+        try {
+            const zip = new JSZip();
+            const pName = document.getElementById('packName').value || "HD Cape Pack";
+            const sBaseName = document.getElementById('skinBaseName').value || "HD Custom Skin";
+            const sType = document.getElementById('skinType').value;
+            const pID = pName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+
+            const manifest = {
+                format_version: 1,
+                header: { name: pName, uuid: crypto.randomUUID(), version: [1, 0, 0] },
+                modules: [{ type: "skin_pack", uuid: crypto.randomUUID(), version: [1, 0, 0] }]
+            };
+
+            const skinsJson = {
+                serialize_name: pID,
+                localization_name: pID,
+                skins: []
+            };
+
+            let langContent = `skinpack.${pID}=${pName}\n`;
+            const itemsToProcess = marketplaceData.filter(item => selectedCapes.has(item.id));
+
+            for (let i = 0; i < itemsToProcess.length; i++) {
+                const item = itemsToProcess[i];
+                const skinFileName = `skin_${i}.png`;
+                const locName = `cape_${i}`;
+
+                // Clear canvas completely
+                dCtx.clearRect(0, 0, 128, 128);
+                dCtx.imageSmoothingEnabled = false;
+                
+                // 1. Draw base skin scaled to 128x128 automatically
+                dCtx.drawImage(skinImg, 0, 0, 128, 128); 
+
+                try {
+                    // 2. Load the external cape asset and run your exact slicing math directly onto the skin canvas
+                    const capeImg = await loadImage(item.texture);
+                    
+                    // Main Face (HD)
+                    dCtx.drawImage(capeImg, 2, 0, 16, 32, LOC.main_face.x, LOC.main_face.y, LOC.main_face.w, LOC.main_face.h);
+                    
+                    // Slicing the 4 side stripes
+                    dCtx.drawImage(capeImg, 0, 0, 2, 32, LOC.stripe1.x, LOC.stripe1.y, LOC.stripe1.w, LOC.stripe1.h);
+                    dCtx.drawImage(capeImg, 18, 0, 2, 32, LOC.stripe2.x, LOC.stripe2.y, LOC.stripe2.w, LOC.stripe2.h);
+                    dCtx.drawImage(capeImg, 20, 0, 2, 32, LOC.stripe3.x, LOC.stripe3.y, LOC.stripe3.w, LOC.stripe3.h);
+                    dCtx.drawImage(capeImg, 38, 0, 2, 32, LOC.stripe4.x, LOC.stripe4.y, LOC.stripe4.w, LOC.stripe4.h);
+
+                    // Overlayers (HD)
+                    dCtx.drawImage(capeImg, 22, 0, 16, 16, LOC.over1.x, LOC.over1.y, LOC.over1.w, LOC.over1.h);
+                    dCtx.drawImage(capeImg, 22, 16, 16, 16, LOC.over2.x, LOC.over2.y, LOC.over2.w, LOC.over2.h);
+                } catch(err) {
+                    console.error(err);
+                    alert(`Error loading cape texture for "${item.name}". The exported entry will be missing its cape layout structure.`);
+                }
+
+                // 3. Export combined custom geometry texture sheet
+                const blob = await new Promise(r => dCanvas.toBlob(r, 'image/png'));
+                zip.file(skinFileName, blob);
+                
+                // 4. Record skin texture reference to skins.json configuration map
+                skinsJson.skins.push({
+                    localization_name: locName,
+                    geometry: "geometry.humanoid.custom",
+                    texture: skinFileName,
+                    type: sType
+                });
+
+                // 5. Build clean display translations
+                langContent += `skin.${pID}.${locName}=${sBaseName} - ${item.name}\n`;
+            }
+
+            zip.file("manifest.json", JSON.stringify(manifest, null, 4));
+            zip.file("skins.json", JSON.stringify(skinsJson, null, 4));
+            if(!zip.folder("texts")) zip.folder("texts");
+            zip.file("texts/en_US.lang", langContent);
+
+            const content = await zip.generateAsync({type:"blob"});
+            saveAs(content, `${pID}.mcpack`);
+            
+        } catch (error) {
+            alert("An error occurred while compiling your pack. Look inside the web developer console.");
+            console.error(error);
+        } finally {
+            document.getElementById('status').style.display = 'none';
+        }
+    }
+
+    // Trigger initialization fetch
+    loadMarketplaceData();
+</script>
+</body>
+</html>

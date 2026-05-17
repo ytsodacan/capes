@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skin Interface Studio</title>
+    <style>
+        /* Modern Reset & Canvas */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            height: 100%;
+            background-color: #050507;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', Roboto, sans-serif;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Ambient Kinetic Background */
+        body::before {
+            content: '';
+            position: absolute;
+            width: 140%;
+            height: 140%;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 90% 80%, rgba(168, 85, 247, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(244, 63, 94, 0.05) 0%, transparent 70%);
+            filter: blur(100px);
+            z-index: 0;
+            animation: pulseBackground 15s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulseBackground {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(-5%, -5%) scale(1.05); }
+        }
+
+        /* Widescreen Interface Container */
+        .interface-container {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 90%;
+            /* Stretched wide for modern luxury dashboard feel */
+            max-width: 750px; 
+            padding: 40px;
+        }
+
+        /* Premium Wide Interactive Rows */
+        .wide-btn {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 76px;
+            padding: 0 32px;
+            text-decoration: none;
+            color: rgba(255, 255, 255, 0.65);
+            font-size: 1.1rem;
+            font-weight: 500;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            
+            /* Glassmorphism surface */
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.00) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 16px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            
+            /* Butter smooth layout transitions */
+            transition: 
+                color 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                border-color 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* Kinetic Accent Line (Hidden by default at the bottom) */
+        .wide-btn::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #6366f1, #a855f7, transparent);
+            transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1), left 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* Sleek Modern Arrow Indicator */
+        .wide-btn .arrow {
+            font-size: 1.2rem;
+            transform: translateX(-10px);
+            opacity: 0;
+            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease;
+            color: #a855f7;
+        }
+
+        /* Hover Physics */
+        .wide-btn:hover {
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.12);
+            /* Soft outward pull instead of aggressive scaling */
+            transform: scale(1.015); 
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+            box-shadow: 
+                0 30px 60px rgba(0, 0, 0, 0.4),
+                0 0 50px rgba(99, 102, 241, 0.05);
+        }
+
+        /* Activate the Kinetic Line on Hover */
+        .wide-btn:hover::after {
+            width: 100%;
+            left: 0;
+        }
+
+        /* Reveal and slide the arrow indicator */
+        .wide-btn:hover .arrow {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        /* Deep click feedback */
+        .wide-btn:active {
+            transform: scale(0.99);
+            transition: transform 0.1s ease;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="interface-container">
+        <a href="create.html" class="wide-btn">
+            <span>Make the Cape</span>
+            <span class="arrow">→</span>
+        </a>
+        <a href="draw.html" class="wide-btn">
+            <span>Draw the Cape</span>
+            <span class="arrow">→</span>
+        </a>
+        <a href="marketplace.html" class="wide-btn">
+            <span>Marketplace</span>
+            <span class="arrow">→</span>
+        </a>
+    </div>
+
+</body>
+</html>

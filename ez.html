@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bulk Dual-Side Cape UV Generator</title>
+
+<style>
+    :root {
+        --bg: #141414;
+        --panel: #1c1c1c;
+        --border: #2a2a2a;
+        --accent: #0ea5e9;
+        --text: #e8e8e8;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        margin: 0;
+        height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Courier New', monospace;
+        display: flex;
+        flex-direction: column;
+    }
+
+    nav {
+        height: 56px;
+        background: var(--panel);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 0 20px;
+        z-index: 20;
+    }
+
+    .title {
+        font-weight: bold;
+        letter-spacing: 2px;
+        color: var(--accent);
+    }
+
+    button {
+        background: #2a2a2a;
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 8px 16px;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: bold;
+    }
+
+    button:hover { background: #333; }
+    
+    button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+    }
+    button.primary:hover { background: #0284c7; }
+
+    button.success {
+        background: #059669;
+        border-color: #059669;
+        color: #fff;
+    }
+    button.success:hover { background: #047857; }
+
+    .file-status {
+        font-size: 13px;
+        color: #a3a3a3;
+        font-weight: bold;
+        background: #222;
+        padding: 4px 10px;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+    }
+
+    .hint {
+        margin-left: auto;
+        color: #888;
+        font-size: 12px;
+        line-height: 1.4;
+        text-align: right;
+    }
+
+    .workspace {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+        background: #111;
+    }
+
+    canvas {
+        background: #111;
+        cursor: crosshair;
+        touch-action: none;
+        width: 100%;
+        height: 100%;
+        display: block;
+        image-rendering: crisp-edges;
+        image-rendering: pixelated;
+    }
+</style>
+</head>
+
+<body>
+
+<nav>
+    <div class="title">DUAL-SIDE CAPE GENERATOR</div>
+    
+    <input type="file" id="imageLoader" style="display:none" accept="image/*" multiple>
+    <button class="primary" onclick="document.getElementById('imageLoader').click()">1. Bulk Upload Images</button>
+    <div id="fileCount" class="file-status">0 files loaded</div>
+    <button class="success" id="exportBtn">2. Export All PNGs</button>
+    
+    <div class="hint">
+        <b>Left Drag</b>: Move/Resize Image • <b>Scroll</b>: Zoom<br>
+        <b>Middle/Right Drag</b>: Pan Canvas
+    </div>
+</nav>
+
+<div class="workspace">
+    <canvas id="editorCanvas"></canvas>
+</div>
+
+<script>
+    const canvas = document.getElementById('editorCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Base dimensions of the Cape UV map
+    const COLS = 40;
+    const ROWS = 32;
+
+    // Viewport state
+    let zoom = 16;
+    let panX = 0;
+    let panY = 0;
+
+    // Bulk Image Queue
+    let imageQueue = []; // Holds items like: { name: "filename.png", img: ImageObject }
+    let imgObj = null;   // Current active preview image (always index 0)
+    
+    // Position parameters shared across all items
+    let imgX = 0, imgY = 0, imgW = 0, imgH = 0;
+
+    // Interaction state
+    let isDragging = false;
+    let isResizing = false;
+    let isPanning = false;
+    let resizeCorner = null;
+
+    function resizeCanvas() {
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight;
+        
+        panX = (canvas.width / 2) - ((COLS * zoom) / 2);
+        panY = (canvas.height / 2) - ((ROWS * zoom) / 2);
+        
+        render();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    function drawGrid() {
+        ctx.imageSmoothingEnabled = false;
+        ctx.mozImageSmoothingEnabled = false;
+        ctx.webkitImageSmoothingEnabled = false;
+        ctx.msImageSmoothingEnabled = false;
+
+        ctx.fillStyle = '#111';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = '#000';
+        ctx.fillRect(Math.floor(panX - 4), Math.floor(panY - 4), Math.floor(COLS * zoom + 8), Math.floor(ROWS * zoom + 8));
+
+        for (let y = 0; y < ROWS; y++) {
+            for (let x = 0; x < COLS; x++) {
+                ctx.fillStyle = (x + y) % 2 === 0 ? '#202020' : '#181818';
+                ctx.fillRect(Math.floor(panX + x * zoom), Math.floor(panY + y * zoom), Math.ceil(zoom), Math.ceil(zoom));
+            }
+        }
+
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(Math.floor(panX + 20 * zoom), Math.floor(panY));
+        ctx.lineTo(Math.floor(panX + 20 * zoom), Math.floor(panY + ROWS * zoom));
+        ctx.stroke();
+
+        if (zoom >= 8) {
+            ctx.font = 'bold 16px Courier New';
+            ctx.fillStyle = 'rgba(255,255,255,0.15)';
+            ctx.textAlign = 'center';
+            ctx.fillText("SIDE 1 (MAIN)", panX + 10 * zoom, panY - 10);
+            ctx.fillText("SIDE 2 (OVERLAYS)", panX + 30 * zoom, panY - 10);
+        }
+    }
+
+    function render() {
+        drawGrid();
+
+        if (imgObj) {
+            ctx.drawImage(
+                imgObj, 
+                Math.floor(panX + imgX * zoom), 
+                Math.floor(panY + imgY * zoom), 
+                Math.ceil(imgW * zoom), 
+                Math.ceil(imgH * zoom)
+            );
+
+            ctx.globalAlpha = 0.5;
+            ctx.drawImage(
+                imgObj, 
+                Math.floor(panX + (imgX + 20) * zoom), 
+                Math.floor(panY + imgY * zoom), 
+                Math.ceil(imgW * zoom), 
+                Math.ceil(imgH * zoom)
+            );
+            ctx.globalAlpha = 1.0;
+
+            const sx = panX + imgX * zoom;
+            const sy = panY + imgY * zoom;
+            const sw = imgW * zoom;
+            const sh = imgH * zoom;
+
+            ctx.strokeStyle = '#0ea5e9';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(sx, sy, sw, sh);
+
+            ctx.fillStyle = '#fff';
+            getHandles(sx, sy, sw, sh).forEach(h => {
+                ctx.fillRect(h.x - 5, h.y - 5, 10, 10);
+            });
+        }
+    }
+
+    function getHandles(x, y, w, h) {
+        return [
+            { corner: 'tl', x, y },
+            { corner: 'tr', x: x + w, y },
+            { corner: 'bl', x, y: y + h },
+            { corner: 'br', x: x + w, y: y + h }
+        ];
+    }
+
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+    canvas.addEventListener('wheel', e => {
+        e.preventDefault();
+        const factor = e.deltaY > 0 ? 0.88 : 1.14;
+        const newZoom = Math.min(Math.max(zoom * factor, 2), 64);
+        
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        
+        panX = mouseX - (mouseX - panX) * (newZoom / zoom);
+        panY = mouseY - (mouseY - panY) * (newZoom / zoom);
+        
+        zoom = newZoom;
+        render();
+    }, { passive: false });
+
+    canvas.addEventListener('mousedown', e => {
+        if (e.button === 1 || e.button === 2) {
+            isPanning = true;
+            return;
+        }
+
+        if (!imgObj) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const sx = panX + imgX * zoom;
+        const sy = panY + imgY * zoom;
+        const sw = imgW * zoom;
+        const sh = imgH * zoom;
+
+        const handles = getHandles(sx, sy, sw, sh);
+        const clickedHandle = handles.find(h => Math.abs(mouseX - h.x) < 8 && Math.abs(mouseY - h.y) < 8);
+
+        if (clickedHandle) {
+            isResizing = true;
+            resizeCorner = clickedHandle.corner;
+            return;
+        }
+
+        if (mouseX >= sx && mouseX <= sx + sw && mouseY >= sy && mouseY <= sy + sh) {
+            isDragging = true;
+        }
+    });
+
+    window.addEventListener('mousemove', e => {
+        if (isPanning) {
+            panX += e.movementX;
+            panY += e.movementY;
+            render();
+            return;
+        }
+
+        if (!isDragging && !isResizing) return;
+
+        const dx = e.movementX / zoom;
+        const dy = e.movementY / zoom;
+
+        if (isDragging) {
+            imgX += dx;
+            imgY += dy;
+        } else if (isResizing) {
+            if (resizeCorner === 'br') { imgW += dx; imgH += dy; }
+            if (resizeCorner === 'tr') { imgW += dx; imgY += dy; imgH -= dy; }
+            if (resizeCorner === 'bl') { imgX += dx; imgW -= dx; imgH += dy; }
+            if (resizeCorner === 'tl') { imgX += dx; imgY += dy; imgW -= dx; imgH -= dy; }
+            
+            imgW = Math.max(1, imgW);
+            imgH = Math.max(1, imgH);
+        }
+
+        render();
+    });
+
+    window.addEventListener('mouseup', () => {
+        isDragging = false;
+        isResizing = false;
+        isPanning = false;
+    });
+
+    // Bulk File Import Logic
+    document.getElementById('imageLoader').addEventListener('change', async e => {
+        const files = Array.from(e.target.files);
+        if (!files.length) return;
+
+        imageQueue = []; 
+        document.getElementById('fileCount').textContent = "Loading files...";
+
+        // Load all images cleanly in parallel via promises
+        const loadPromises = files.map(file => {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = ev => {
+                    const img = new Image();
+                    img.onload = () => resolve({ name: file.name, img: img });
+                    img.src = ev.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+
+        imageQueue = await Promise.all(loadPromises);
+
+        if (imageQueue.length > 0) {
+            document.getElementById('fileCount').textContent = `${imageQueue.length} files loaded`;
+            
+            // Set up placement properties matching the first loaded asset
+            imgObj = imageQueue[0].img;
+            imgW = 12;
+            imgH = imgW * (imgObj.height / imgObj.width);
+            imgX = (20 - imgW) / 2;
+            imgY = (ROWS - imgH) / 2;
+
+            render();
+        }
+        e.target.value = '';
+    });
+
+    // Bulk File Export Logic
+    document.getElementById('exportBtn').addEventListener('click', () => {
+        if (!imageQueue.length) {
+            alert("Please upload images first!");
+            return;
+        }
+
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = COLS;
+        exportCanvas.height = ROWS;
+        const exportCtx = exportCanvas.getContext('2d');
+        
+        exportCtx.imageSmoothingEnabled = false;
+        exportCtx.mozImageSmoothingEnabled = false;
+        exportCtx.webkitImageSmoothingEnabled = false;
+        exportCtx.msImageSmoothingEnabled = false;
+
+        // Process every single file using the shared transform configurations
+        imageQueue.forEach((item) => {
+            exportCtx.clearRect(0, 0, COLS, ROWS);
+
+            // Draw current asset onto Side 1
+            exportCtx.drawImage(item.img, imgX, imgY, imgW, imgH);
+            
+            // Mirror onto Side 2 (+20 coordinate layout shift)
+            exportCtx.drawImage(item.img, imgX + 20, imgY, imgW, imgH);
+
+            // Create download anchor preserving original file names
+            const a = document.createElement('a');
+            a.href = exportCanvas.toDataURL('image/png');
+            a.download = item.name;
+            a.click();
+        });
+    });
+
+    resizeCanvas();
+</script>
+
+</body>
+</html>
